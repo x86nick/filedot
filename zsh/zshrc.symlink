@@ -1,0 +1,90 @@
+#!/bin/zsh
+
+export DOTFILES="${HOME}/.dotfiles"
+
+unsetopt MAIL_WARNING       # Don't print a warning message if a mail file has been accessed.
+setopt NOTIFY               # Report status of background jobs immediately.
+
+setopt HIST_BEEP            # Beep when accessing non-existent history.
+
+setopt AUTO_CD              # Auto changes to a directory without typing cd.
+setopt AUTO_PUSHD           # Push the old directory onto the stack on cd.
+setopt AUTO_NAME_DIRS
+
+export LANG=${LANG:-en_US.UTF-8}
+export WORDCHARS='*?_-[]~;!#%^(){}<>'
+
+export EDITOR='nvim'
+export VEDITOR='code'
+export PAGER="less"
+
+# Hitory
+export HISTSIZE=10000
+export SAVEHIST=10000
+export HISTFILE=$HOME/.zsh_history
+setopt INC_APPEND_HISTORY
+setopt HIST_IGNORE_DUPS
+setopt EXTENDED_HISTORY
+
+# Async ZSH
+export ZSH_AUTOSUGGEST_USE_ASYNC=true
+
+export CASE_SENSITIVE=0
+export CLICOLOR=1
+
+export PURE_PROMPT_SYMBOL='λ'
+
+_zcompinit_custom() {
+  autoload -Uz compinit
+  local zcd="${HOME}/.zcompdump"
+  local zcdc="${zcd}.zwc"
+  # Compile the completion dump to increase startup speed, if dump is newer or doesn't exist,
+  # in the background as this is doesn't affect the current session
+  if [[ -f "${zcd}"(#qN.m+1) ]]; then
+        compinit -i -d "${zcd}"
+        { rm -f "${zcdc}" && zcompile "${zcd}" } &!
+  else
+        compinit -C -d "${zcd}"
+        { [[ ! -f "${zcdc}" || "${zcd}" -nt "${zcdc}" ]] && rm -f "${zcdc}" && zcompile "${zcd}" } &!
+  fi
+}
+
+typeset -U config_files
+config_files=(${DOTFILES}/*/*.zsh)
+
+# load the path files
+for file in ${(M)config_files:#*/path.zsh}; do
+  source "${file}"
+done
+
+# load antibody plugins
+source ~/.zsh_plugins.sh
+
+# https://github.com/zdharma/fast-syntax-highlighting/issues/135#issuecomment-497452498
+export FAST_HIGHLIGHT[whatis_chroma_type]=0
+
+# load everything but the path and completion files
+for file in ${${config_files:#*/path.zsh}:#*/completion.zsh}; do
+  source "${file}"
+done
+
+# init completion
+_zcompinit_custom
+
+# load every completion after autocomplete loads
+for file in ${(M)config_files:#*/completion.zsh}; do
+  source "${file}"
+done
+
+unset config_files
+
+# use .localrc for SUPER SECRET CRAP that you don't
+# want in your public, versioned repo.
+[ -f ~/.localrc ] && . ~/.localrc
+
+# start tmux if exists and if in interactive mode
+#if command -v tmux &> /dev/null && [ -n "${PS1}" ] && [[ ! "${TERM}" =~ screen ]] && [[ ! "${TERM}" =~ tmux ]] && [ -z "${TMUX}" ]; then
+#  exec tmux
+#fi
+
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
